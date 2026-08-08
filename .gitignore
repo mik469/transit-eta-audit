@@ -1,0 +1,21 @@
+# Generated outputs -- everything here is rebuilt by run_all.sh
+out/
+figs/
+dashboard.html
+gtfs_static
+septa_gtfs.zip
+
+# Raw feeds (~180 MB, see data/README.md)
+data/*.parquet
+
+__pycache__/
+.pytest_cache/
+*.py[cod]
+.venv/
+venv/
+.env
+
+.DS_Store
+.idea/
+.vscode/
+*.swp
