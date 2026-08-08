@@ -125,10 +125,6 @@ pins it. `docs/reproducing.md` has the detail and the command to verify it yours
 ## Data
 
 The raw feeds are about 180 MB and are not in the repository. `data/README.md` explains
-where they come from and how to fetch them.
-
-## Licence
-
-MIT, see `LICENSE`. The GTFS-Realtime archive data is SEPTA's, redistributed by
-[gtfsrt.io](https://gtfsrt.io) under its own terms; the static schedule comes from
-SEPTA's developer portal.
+where they come from and how to fetch them. The GTFS-Realtime archive data is SEPTA's,
+redistributed by [gtfsrt.io](https://gtfsrt.io) under its own terms; the static schedule
+comes from SEPTA's developer portal.
