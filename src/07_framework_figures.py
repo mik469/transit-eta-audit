@@ -34,7 +34,6 @@ def arrow(ax, p, q, color=GREY, lw=1.3, ls="-", rad=0.0):
                                  linewidth=lw, linestyle=ls, shrinkA=1, shrinkB=1,
                                  connectionstyle=f"arc3,rad={rad}"))
 
-# Design-science activities on top, the CRISP-DM phase each one corresponds to below.
 fig, ax = plt.subplots(figsize=(9.6, 3.0)); ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.axis("off")
 dsr = ["Problem\nidentification", "Objectives of\na solution", "Design and\ndevelopment",
        "Demonstration", "Evaluation", "Communication"]
@@ -60,8 +59,6 @@ ax.text(0.5, 0.10, "evaluation feeds back into design", ha="center", va="center"
 plt.savefig(FIGS / "07_dsr_crispdm.png", dpi=config.FIG_DPI, bbox_inches="tight"); plt.close()
 print("  wrote 07_dsr_crispdm.png")
 
-# A timeline with the model underneath it: everything left of the publication instant
-# is admissible, anything to the right of it is leakage.
 fig, ax = plt.subplots(figsize=(8.2, 3.4)); ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.axis("off")
 TL = 0.66
 ax.plot([0.06, 0.95], [TL, TL], color=INK, lw=1.3)

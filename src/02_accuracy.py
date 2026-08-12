@@ -53,8 +53,6 @@ metrics = {
 for key, value in metrics.items():
     print(f"  {key:<18} {value}")
 
-# Distribution of signed error. Negative means the vehicle turned up after the countdown
-# said it would, which is the direction that costs a passenger waiting time.
 hist = con.execute(f"""
     SELECT floor(error / 15.0) * 15 AS bucket, count(*) AS c
     FROM read_parquet('{pairs}')
@@ -75,8 +73,6 @@ plt.tight_layout()
 plt.savefig(config.FIGS / "02_error_distribution.png", dpi=config.FIG_DPI)
 plt.close()
 
-# Accuracy against lead time. This is the structure a single headline number hides: a
-# claim made 30 seconds out and one made 40 minutes out are not the same assertion.
 bands = con.execute(f"""
     SELECT {config.LEAD_BANDS_SQL} AS band,
            min(lead)                      AS ord,
@@ -120,10 +116,6 @@ if stated > 1000:
 else:
     print("  feed states no uncertainty at all, so building conformal intervals instead")
 
-# Split conformal. Fit the interval half-width on one half of the trips, measure how
-# often it actually covers on the other half. Splitting by trip rather than by row
-# matters: rows within a trip are dependent, and a row-level split would flatter the
-# coverage figure.
 levels = [0.5, 0.8, 0.9, 0.95]
 empirical = []
 for level in levels:

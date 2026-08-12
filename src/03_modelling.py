@@ -38,15 +38,6 @@ con = duckdb.connect()
 
 print("Stage 3: failure-cause modelling")
 
-# Training on all 11.8M rows is unnecessary and slow, so take one row in twenty. The
-# filter hashes the row key rather than using DuckDB's reservoir sampling: reservoir
-# results depend on the order rows come off a parallel scan, so they change between runs.
-#
-# The ORDER BY is load-bearing too, and it cost us an afternoon to work out. The hash
-# filter fixes *which* rows come back but not what order they arrive in, and XGBoost's
-# subsample picks rows by position, so re-running stage 1 could reshuffle the parquet
-# and move MAE and R2 in the third decimal without anything else changing. Sorting on the
-# row key pins the order regardless of how the file was written.
 df = con.execute(f"""
     SELECT abs_error,
            (abs_error > {config.LARGE_FAILURE_S})::INT AS fail,
@@ -65,8 +56,6 @@ df = con.execute(f"""
 
 is_train = df.grp < 8
 
-# Route busyness is a summary of the data, so it has to be learned on the training
-# trips alone. Computing it over everything would leak the test set into training.
 busyness = df.loc[is_train, "route_id"].value_counts()
 df["route_freq"] = df["route_id"].map(busyness).fillna(0)
 
@@ -75,8 +64,6 @@ x_train, x_test = train[FEATURES], test[FEATURES]
 print(f"  features: {', '.join(FEATURES)}")
 print(f"  {len(train):,} train / {len(test):,} test rows, disjoint trips")
 
-# Conventional settings rather than tuned ones. The objective is diagnosis, and an
-# extensive search over the test partition would be a form of leakage in itself.
 common = dict(n_estimators=350, max_depth=6, learning_rate=0.08, subsample=0.8,
               colsample_bytree=0.8, n_jobs=4, random_state=42)
 
@@ -108,17 +95,12 @@ def thin(values, n=60):
 fpr, tpr, _ = roc_curve(actual, scores)
 precision, recall, _ = precision_recall_curve(actual, scores)
 
-# Exact TreeSHAP straight from the booster. The standalone shap package would not install
-# against the numpy version here, and pred_contribs gives exact values for tree ensembles
-# rather than sampled approximations, so this is the better route anyway.
 sample = x_test.sample(4000, random_state=1)
 contributions = regressor.get_booster().predict(xgb.DMatrix(sample), pred_contribs=True)
-shap_values = contributions[:, :-1]          # last column is the base value
+shap_values = contributions[:, :-1]
 importance = np.abs(shap_values).mean(0)
-order = np.argsort(importance)               # ascending, so the biggest driver plots last
+order = np.argsort(importance)
 
-# Beeswarm: one point per prediction, x is the seconds of error attributed to that
-# feature, colour is the feature's own value.
 feature_values = sample.values.astype(float)
 jitter = np.random.default_rng(0)
 fig, ax = plt.subplots(figsize=(7.4, 4.8))

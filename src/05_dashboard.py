@@ -31,9 +31,6 @@ with open(config.MODELLING_METRICS) as fh:
 con = duckdb.connect()
 print("Stage 5: dashboard")
 
-# Real route names from the static schedule, so the leaderboard reads
-# "Germantown-Chelten to 69th St TC" rather than an internal code. Falls back to the raw
-# id if the static feed is missing.
 ROUTES = config.GTFS_STATIC / "google_bus" / "routes.txt"
 RN = {}
 if ROUTES.exists():
@@ -55,13 +52,11 @@ def dv(fig, name): return pio.to_html(fig, include_plotlyjs=False, full_html=Fal
 
 BANDS = config.LEAD_BANDS_SQL
 
-# 1 accuracy vs lead
 d = con.execute(f"SELECT {BANDS} b, min(lead) o, median(abs_error)/60 m FROM read_parquet('{PAIRS}') GROUP BY b ORDER BY o").fetchall()
 f1 = go.Figure(go.Bar(x=[r[0] for r in d], y=[r[2] for r in d], marker_color=BLUE,
     hovertemplate="lead %{x} min ahead<br><b>%{y:.2f} min</b> median error<extra></extra>"))
 p1 = dv(style(f1, yt="median |error| (min)", xt="lead time (min ahead)"), "p1")
 
-# 2 ECDF (cumulative accuracy)
 tot = con.execute(f"SELECT count(*) FROM read_parquet('{PAIRS}')").fetchone()[0]
 bins = con.execute(f"SELECT floor(least(abs_error,600)/15)*15 b, count(*) c FROM read_parquet('{PAIRS}') GROUP BY b ORDER BY b").fetchall()
 cum, run = [], 0
@@ -71,13 +66,11 @@ f2 = go.Figure(go.Scatter(x=[c[0] for c in cum], y=[c[1] for c in cum], mode="li
 f2.add_vline(x=120, line=dict(color=ORANGE, dash="dot"))
 p2 = dv(style(f2, yt="% of predictions", xt="absolute error <= (s)"), "p2")
 
-# 3 error distribution
 h = con.execute(f"SELECT floor(error/15.0)*15/60 b, count(*) c FROM read_parquet('{PAIRS}') WHERE error BETWEEN -900 AND 900 GROUP BY b ORDER BY b").fetchall()
 f3 = go.Figure(go.Bar(x=[r[0] for r in h], y=[r[1] for r in h], marker_color=ORANGE,
     hovertemplate="error %{x:.1f} min<br>%{y:,} pairs<extra></extra>"))
 p3 = dv(style(f3, yt="matched pairs", xt="error (min, + = predicted late)"), "p3")
 
-# 4 heatmap: hour x lead band
 hm = con.execute(f"SELECT hour, {BANDS} b, min(lead) o, median(abs_error) e FROM read_parquet('{PAIRS}') GROUP BY hour, b ORDER BY hour, o").fetchall()
 order = ["0-2", "2-5", "5-10", "10-20", "20-60"]
 z = [[None] * 24 for _ in order]
@@ -87,7 +80,6 @@ f4 = go.Figure(go.Heatmap(z=z, x=list(range(24)), y=order, colorscale="YlOrRd",
     colorbar=dict(title="med |err| (s)"), hovertemplate="%{x}:00, lead %{y} min<br><b>%{z:.0f}s</b><extra></extra>"))
 p4 = dv(style(f4, yt="lead (min)", xt="hour of day"), "p4")
 
-# 5 calibration
 cov = acc["conformal_empirical_coverage_pct"]; nom = [int(k) for k in cov]; emp = [cov[k] for k in cov]
 f5 = go.Figure()
 f5.add_scatter(x=[50, 95], y=[50, 95], mode="lines", line=dict(color="#94a3b8", dash="dash"), hoverinfo="skip")
@@ -95,21 +87,17 @@ f5.add_scatter(x=nom, y=emp, mode="lines+markers", line=dict(color=BLUE, width=2
     hovertemplate="nominal %{x}%<br><b>empirical %{y:.1f}%</b><extra></extra>")
 p5 = dv(style(f5, yt="empirical coverage (%)", xt="nominal coverage (%)"), "p5")
 
-# 6 SHAP
 si = mod["shap_importance_s"]; keys = list(si)[::-1]
 f6 = go.Figure(go.Bar(x=[si[k] for k in keys], y=keys, orientation="h", marker_color=BLUE,
     hovertemplate="%{y}<br><b>%{x:.1f}s</b> mean |SHAP|<extra></extra>"))
 p6 = dv(style(f6, xt="mean |SHAP| (s)"), "p6")
 
-# 7 worst routes. The route_id tiebreak is load-bearing: routes tie on median error,
-# and without it the LIMIT can admit a different route on each run.
 r = con.execute(f"SELECT route_id, median(abs_error) e, count(*) n FROM read_parquet('{PAIRS}') WHERE route_id IS NOT NULL GROUP BY route_id HAVING count(*)>=5000 ORDER BY e DESC, route_id LIMIT 12").fetchall()
 f7 = go.Figure(go.Bar(x=[x[1] for x in r][::-1], y=[rname(x[0]) for x in r][::-1], orientation="h",
     marker_color=BLUE, customdata=[[x[2], rlong(x[0])] for x in r][::-1],
     hovertemplate="<b>%{y}</b>  %{customdata[1]}<br>%{x:.0f}s median error &middot; %{customdata[0]:,} pairs<extra></extra>"))
 p7 = dv(style(f7, xt="median |error| (s)"), "p7")
 
-# sortable benchmark leaderboard (routes with real names)
 lb = con.execute(f"""SELECT route_id, median(abs_error) med, quantile_cont(abs_error,0.9) p90,
    100.0*avg(CASE WHEN abs_error<=120 THEN 1 ELSE 0 END) w2, count(*) n
  FROM read_parquet('{PAIRS}') WHERE route_id IS NOT NULL GROUP BY route_id HAVING count(*)>=2000 ORDER BY med DESC, route_id""").fetchall()
@@ -128,15 +116,12 @@ leaderboard = (
     "<th onclick='sortLB(this,4,true)'>Within 2min<i></i></th><th onclick='sortLB(this,5,true)'>Pairs<i></i></th>"
     f"</tr></thead><tbody>{rows}</tbody></table></div>")
 
-# 8 bias by hour (diverging)
 b = con.execute(f"SELECT hour, median(error) m FROM read_parquet('{PAIRS}') GROUP BY hour ORDER BY hour").fetchall()
 f8 = go.Figure(go.Bar(x=[x[0] for x in b], y=[x[1] for x in b],
     marker=dict(color=[x[1] for x in b], colorscale="RdBu", cmid=0, reversescale=True, showscale=False),
     hovertemplate="%{x}:00<br><b>%{y:.0f}s</b> median error<extra></extra>"))
 p8 = dv(style(f8, yt="median error (s, +late/-early)", xt="hour of day"), "p8")
 
-# --- extra analytics panels ---------------------------------------------------------
-# fan chart: signed-error p10 / p50 / p90 by lead (the distribution widening)
 fan = con.execute(f"""SELECT {BANDS} b, min(lead) o, quantile_cont(error,0.1)/60 p10,
    quantile_cont(error,0.5)/60 p50, quantile_cont(error,0.9)/60 p90
  FROM read_parquet('{PAIRS}') GROUP BY b ORDER BY o""").fetchall()
@@ -148,7 +133,6 @@ ffan.add_scatter(x=xb, y=[r[3] for r in fan], mode="lines+markers", line=dict(co
     hovertemplate="lead %{x} min<br>median %{y:.2f} min (band = p10-p90)<extra></extra>")
 pfan = dv(style(ffan, yt="signed error (min)", xt="lead time (min ahead)"), "pfan")
 
-# ROC curve of the large-failure classifier
 froc = go.Figure()
 froc.add_scatter(x=[0, 1], y=[0, 1], mode="lines", line=dict(color="#94a3b8", dash="dash"), hoverinfo="skip")
 froc.add_scatter(x=mod["roc"]["fpr"], y=mod["roc"]["tpr"], mode="lines", line=dict(color=BLUE, width=2),
@@ -156,14 +140,12 @@ froc.add_scatter(x=mod["roc"]["fpr"], y=mod["roc"]["tpr"], mode="lines", line=di
 froc.add_annotation(x=0.63, y=0.12, text=f"AUC = {mod['clf_auc']:.2f}", showarrow=False, font=dict(size=13, color=INK))
 proc = dv(style(froc, yt="true positive rate", xt="false positive rate"), "proc")
 
-# error vs stop position on the trip
 sp = con.execute(f"""SELECT stop_sequence s, median(abs_error) m FROM read_parquet('{PAIRS}')
  WHERE stop_sequence BETWEEN 1 AND 50 GROUP BY stop_sequence HAVING count(*)>=1000 ORDER BY s""").fetchall()
 fpos = go.Figure(go.Scatter(x=[r[0] for r in sp], y=[r[1] for r in sp], mode="lines+markers",
     line=dict(color=BLUE, width=2), hovertemplate="stop #%{x} on trip<br>%{y:.0f}s median<extra></extra>"))
 ppos = dv(style(fpos, yt="median |error| (s)", xt="stop position (sequence on trip)"), "ppos")
 
-# inbound vs outbound
 dr = con.execute(f"""SELECT direction_id d, median(abs_error) m, 100.0*avg(CASE WHEN abs_error<=120 THEN 1 ELSE 0 END) w2, count(*) n
  FROM read_parquet('{PAIRS}') WHERE direction_id IS NOT NULL GROUP BY direction_id ORDER BY direction_id""").fetchall()
 DIRN = {0: "Outbound", 1: "Inbound"}
@@ -172,10 +154,6 @@ fdir = go.Figure(go.Bar(x=[DIRN.get(int(r[0]), str(r[0])) for r in dr], y=[r[1] 
     hovertemplate="%{x}<br>%{y:.0f}s median · %{customdata[0]:.0f}% within 2min · %{customdata[1]:,} pairs<extra></extra>"))
 pdir = dv(style(fdir, yt="median |error| (s)"), "pdir")
 
-# map with a metric switcher.
-# Stop coordinates come from SEPTA's OFFICIAL GTFS static stops.txt (exact stop_lat/stop_lon),
-# not estimated from vehicle GPS. Falls back to a GPS-median estimate only if the static feed
-# is absent (download once: https://www3.septa.org/developer/gtfs_public.zip -> gtfs_static/).
 BUS = config.GTFS_STATIC / "google_bus" / "stops.txt"
 RAIL = config.GTFS_STATIC / "google_rail" / "stops.txt"
 if BUS.exists():
@@ -195,9 +173,6 @@ m = con.execute(f"""WITH c AS ({coords_sql}),
 sids = [str(x[0]) for x in m]
 lat = [x[1] for x in m]; lon = [x[2] for x in m]
 med = [x[3] for x in m]; p90 = [x[4] for x in m]; w2 = [x[5] for x in m]; cnt = [x[6] for x in m]
-# route -> indices of its stops in the map trace (for click-to-highlight cross-filtering).
-# Both this and the map query above are ordered: their row order becomes array position,
-# so an unordered parallel scan would make the built file differ between runs.
 sid_to_idx = {s: i for i, s in enumerate(sids)}
 route_stops = {}
 RS = config.GTFS_STATIC / "google_bus" / "route_stops.txt"
@@ -206,10 +181,9 @@ if RS.exists():
         i = sid_to_idx.get(str(sid))
         if i is not None: route_stops.setdefault(str(rid), []).append(i)
 route_stops_json = json.dumps(route_stops)
-map_sizes = [round(min(6 + v / 400, 20), 2) for v in cnt]           # dot size ~ traffic
+map_sizes = [round(min(6 + v / 400, 20), 2) for v in cnt]
 sizes_json = json.dumps(map_sizes)
 home_json = json.dumps({"lat": round(sum(lat) / len(lat), 5), "lon": round(sum(lon) / len(lon), 5), "zoom": 9.4})
-# colour capped at cmax so a few 20-min outlier stops don't wash out the 99% that sit under ~200s
 fmap = go.Figure(go.Scattermapbox(lat=lat, lon=lon, mode="markers",
     marker=dict(size=map_sizes, color=med, colorscale="YlOrRd", cmin=0, cmax=180, showscale=True,
                 colorbar=dict(orientation="h", x=0.5, xanchor="center", y=0.0, yanchor="bottom",
@@ -217,7 +191,7 @@ fmap = go.Figure(go.Scattermapbox(lat=lat, lon=lon, mode="markers",
     text=[f"{e:.0f}s median | {c:,} pairs" for e, c in zip(med, cnt)], hovertemplate="%{text}<extra></extra>"))
 btn = lambda lab, col, cs, ttl, cx: dict(label=lab, method="restyle",
     args=[{"marker.color": [col], "marker.colorscale": cs, "marker.colorbar.title.text": [ttl],
-           "marker.cmin": 0, "marker.cmax": cx}, [0]])   # [0] = only the base stops trace, not a highlight
+           "marker.cmin": 0, "marker.cmax": cx}, [0]])
 fmap.update_layout(height=470, margin=dict(l=0, r=0, t=0, b=0),
     mapbox=dict(style="open-street-map", center=dict(lat=sum(lat)/len(lat), lon=sum(lon)/len(lon)), zoom=9.4),
     updatemenus=[dict(type="dropdown", x=0.01, y=0.99, xanchor="left", yanchor="top", bgcolor="white",
@@ -225,14 +199,11 @@ fmap.update_layout(height=470, margin=dict(l=0, r=0, t=0, b=0),
                  btn("90th-pct error", p90, "YlOrRd", "90th-pct |error| (s)", 400),
                  btn("Within 2 min %", w2, "YlGn", "within 2 min (%)", 100),
                  btn("Traffic (pairs)", cnt, "Blues", "pairs", 3000)])])
-# the map needs its own config: scroll/pinch zoom on + a small toolbar (the other
-# charts hide the toolbar, but a map is useless if you can't zoom into it)
 MAP_CFG = {"displayModeBar": True, "scrollZoom": True, "responsive": True, "displaylogo": False,
            "modeBarButtonsToRemove": ["select2d", "lasso2d", "toImage"]}
 pmap = pio.to_html(fmap, include_plotlyjs=False, full_html=False, div_id="pmap", config=MAP_CFG)
 print(f"  map: {len(m):,} stops from {coord_src}, 4 switchable metrics")
 
-# Per-route slices for the global filter. These drive the KPI tiles and several charts.
 BAND_ORDER = config.BAND_ORDER
 routes_in = [str(x[0]) for x in lb]
 rin_sql = "(" + ",".join("'" + r.replace("'", "''") + "'" for r in routes_in) + ")"

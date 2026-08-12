@@ -25,7 +25,6 @@ con = duckdb.connect()
 
 print("Stage 6: report figures")
 
-# Funnel: what the pipeline discards, and where.
 raw = con.execute(f"SELECT count(*) FROM read_parquet({config.TRIP_UPDATES})").fetchone()[0]
 keyed = con.execute(f"""
     SELECT count(*) FROM read_parquet({config.TRIP_UPDATES})
@@ -68,9 +67,6 @@ if not bus_stops.exists():
     print("  skipping the maps: GTFS static is missing, run run_all.sh to fetch it")
     raise SystemExit
 
-# Stop coordinates come from the published stops.txt, not from the GPS feed. An earlier
-# version took the median of vehicle positions per stop, which put a handful of reused
-# stop ids about twelve kilometres from where they actually are.
 coords = f"""
     SELECT sid, any_value(lat) AS lat, any_value(lon) AS lon
     FROM (
@@ -99,7 +95,7 @@ error = np.array([r[2] for r in rows])
 traffic = np.array([r[3] for r in rows])
 
 fig, ax = plt.subplots(figsize=(6.8, 6.4))
-worst_last = np.argsort(error)          # draw the bad stops on top so they stay visible
+worst_last = np.argsort(error)
 scatter = ax.scatter(lon[worst_last], lat[worst_last],
                      c=np.clip(error[worst_last], 0, 180),
                      s=np.clip(3 + traffic[worst_last] / 900, 3, 26),
@@ -118,7 +114,6 @@ plt.close()
 print(f"  map: {len(rows):,} stops, median of stop medians {np.median(error):.0f}s, "
       f"worst {error.max():.0f}s")
 
-# The same data as the dashboard's map panel, exported at print resolution.
 try:
     import plotly.graph_objects as go
 

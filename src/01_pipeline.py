@@ -30,8 +30,6 @@ con = duckdb.connect()
 
 print("Stage 1: pipeline and ground-truth reconstruction")
 
-# One row per published arrival estimate. Lead time is derived here rather than later so
-# it can't drift away from the timestamps it came from.
 con.execute(f"""
     CREATE TABLE pred AS
     SELECT CAST(trip_id AS VARCHAR)   AS trip_id,
@@ -58,7 +56,6 @@ volumes = {}
 
 for mode, positions, filename in MODES:
     if mode == "bus":
-        # Bus positions carry stop_id, so the earliest report at a stop is the arrival.
         con.execute(f"""
             CREATE OR REPLACE TABLE truth AS
             SELECT CAST(trip_id AS VARCHAR) AS trip_id,
@@ -73,8 +70,6 @@ for mode, positions, filename in MODES:
         """)
         join_on = "p.trip_id = t.trip_id AND p.stop_id = t.stop_id"
     else:
-        # Rail predictions have no stop_id, so match on sequence and take the stop from
-        # the GPS feed instead.
         con.execute(f"""
             CREATE OR REPLACE TABLE truth AS
             SELECT CAST(trip_id AS VARCHAR) AS trip_id,
