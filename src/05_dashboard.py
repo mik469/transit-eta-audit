@@ -78,7 +78,7 @@ f3 = go.Figure(go.Bar(x=[r[0] for r in h], y=[r[1] for r in h], marker_color=ORA
 p3 = dv(style(f3, yt="matched pairs", xt="error (min, + = predicted late)"), "p3")
 
 # 4 heatmap: hour x lead band
-hm = con.execute(f"SELECT hour, {BANDS} b, min(lead) o, median(abs_error) e FROM read_parquet('{PAIRS}') GROUP BY hour, b").fetchall()
+hm = con.execute(f"SELECT hour, {BANDS} b, min(lead) o, median(abs_error) e FROM read_parquet('{PAIRS}') GROUP BY hour, b ORDER BY hour, o").fetchall()
 order = ["0-2", "2-5", "5-10", "10-20", "20-60"]
 z = [[None] * 24 for _ in order]
 for hr, b, o, e in hm:
@@ -101,8 +101,9 @@ f6 = go.Figure(go.Bar(x=[si[k] for k in keys], y=keys, orientation="h", marker_c
     hovertemplate="%{y}<br><b>%{x:.1f}s</b> mean |SHAP|<extra></extra>"))
 p6 = dv(style(f6, xt="mean |SHAP| (s)"), "p6")
 
-# 7 worst routes
-r = con.execute(f"SELECT route_id, median(abs_error) e, count(*) n FROM read_parquet('{PAIRS}') WHERE route_id IS NOT NULL GROUP BY route_id HAVING count(*)>=5000 ORDER BY e DESC LIMIT 12").fetchall()
+# 7 worst routes. The route_id tiebreak is load-bearing: routes tie on median error,
+# and without it the LIMIT can admit a different route on each run.
+r = con.execute(f"SELECT route_id, median(abs_error) e, count(*) n FROM read_parquet('{PAIRS}') WHERE route_id IS NOT NULL GROUP BY route_id HAVING count(*)>=5000 ORDER BY e DESC, route_id LIMIT 12").fetchall()
 f7 = go.Figure(go.Bar(x=[x[1] for x in r][::-1], y=[rname(x[0]) for x in r][::-1], orientation="h",
     marker_color=BLUE, customdata=[[x[2], rlong(x[0])] for x in r][::-1],
     hovertemplate="<b>%{y}</b>  %{customdata[1]}<br>%{x:.0f}s median error &middot; %{customdata[0]:,} pairs<extra></extra>"))
@@ -111,7 +112,7 @@ p7 = dv(style(f7, xt="median |error| (s)"), "p7")
 # sortable benchmark leaderboard (routes with real names)
 lb = con.execute(f"""SELECT route_id, median(abs_error) med, quantile_cont(abs_error,0.9) p90,
    100.0*avg(CASE WHEN abs_error<=120 THEN 1 ELSE 0 END) w2, count(*) n
- FROM read_parquet('{PAIRS}') WHERE route_id IS NOT NULL GROUP BY route_id HAVING count(*)>=2000 ORDER BY med DESC""").fetchall()
+ FROM read_parquet('{PAIRS}') WHERE route_id IS NOT NULL GROUP BY route_id HAVING count(*)>=2000 ORDER BY med DESC, route_id""").fetchall()
 rows = "".join(
     f"<tr data-route=\"{x[0]}\" data-name=\"{rname(x[0])} {rlong(x[0])}\" onclick=\"applyRoute('{x[0]}')\">"
     f"<td>{rname(x[0])}</td><td class='n'>{rlong(x[0])}</td>"
@@ -190,16 +191,18 @@ else:
 m = con.execute(f"""WITH c AS ({coords_sql}),
  e AS (SELECT CAST(stop_id AS VARCHAR) sid, median(abs_error) er, quantile_cont(abs_error,0.9) p90,
    100.0*avg(CASE WHEN abs_error<=120 THEN 1 ELSE 0 END) w2, count(*) n FROM read_parquet('{PAIRS}') GROUP BY sid HAVING count(*)>=200)
- SELECT e.sid, c.lat, c.lon, e.er, e.p90, e.w2, e.n FROM e JOIN c USING(sid)""").fetchall()
+ SELECT e.sid, c.lat, c.lon, e.er, e.p90, e.w2, e.n FROM e JOIN c USING(sid) ORDER BY e.sid""").fetchall()
 sids = [str(x[0]) for x in m]
 lat = [x[1] for x in m]; lon = [x[2] for x in m]
 med = [x[3] for x in m]; p90 = [x[4] for x in m]; w2 = [x[5] for x in m]; cnt = [x[6] for x in m]
-# route -> indices of its stops in the map trace (for click-to-highlight cross-filtering)
+# route -> indices of its stops in the map trace (for click-to-highlight cross-filtering).
+# Both this and the map query above are ordered: their row order becomes array position,
+# so an unordered parallel scan would make the built file differ between runs.
 sid_to_idx = {s: i for i, s in enumerate(sids)}
 route_stops = {}
 RS = config.GTFS_STATIC / "google_bus" / "route_stops.txt"
 if RS.exists():
-    for rid, sid in con.execute(f"SELECT CAST(route_id AS VARCHAR), CAST(stop_id AS VARCHAR) FROM read_csv_auto('{RS}')").fetchall():
+    for rid, sid in con.execute(f"SELECT CAST(route_id AS VARCHAR), CAST(stop_id AS VARCHAR) FROM read_csv_auto('{RS}') ORDER BY 1, 2").fetchall():
         i = sid_to_idx.get(str(sid))
         if i is not None: route_stops.setdefault(str(rid), []).append(i)
 route_stops_json = json.dumps(route_stops)
