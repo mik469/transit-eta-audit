@@ -57,7 +57,7 @@ ax.set_title("Attrition from raw prediction feed to non-circular matched pairs")
 ax.spines[["top", "right"]].set_visible(False)
 ax.get_xaxis().set_visible(False)
 plt.tight_layout()
-plt.savefig(config.FIGS / "06_pipeline_funnel.png", dpi=160)
+plt.savefig(config.FIGS / "06_pipeline_funnel.png", dpi=config.FIG_DPI)
 plt.close()
 print(f"  funnel: {raw:,} -> {keyed:,} -> {in_window:,} -> {matched:,} "
       f"({100 * matched / in_window:.1f}% of in-window)")
@@ -113,7 +113,7 @@ ax.set_title(f"Where predictions fail: {len(rows):,} SEPTA stops\n"
 ax.set_aspect(1 / np.cos(np.radians(float(lat.mean()))))
 ax.spines[["top", "right"]].set_visible(False)
 plt.tight_layout()
-plt.savefig(config.FIGS / "06_geo_map.png", dpi=160)
+plt.savefig(config.FIGS / "06_geo_map.png", dpi=config.FIG_DPI)
 plt.close()
 print(f"  map: {len(rows):,} stops, median of stop medians {np.median(error):.0f}s, "
       f"worst {error.max():.0f}s")

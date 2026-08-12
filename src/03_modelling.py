@@ -139,7 +139,7 @@ scale.set_array([])
 plt.colorbar(scale, ax=ax, label="feature value (low -> high)")
 ax.spines[["top", "right"]].set_visible(False)
 plt.tight_layout()
-plt.savefig(config.FIGS / "03_shap_summary.png", dpi=140)
+plt.savefig(config.FIGS / "03_shap_summary.png", dpi=config.FIG_DPI)
 plt.close()
 
 plt.figure(figsize=(6.6, 4))
@@ -147,7 +147,7 @@ plt.barh([FEATURES[i] for i in order], [importance[i] for i in order], color=con
 plt.xlabel("mean |SHAP|  (seconds of error attributed)")
 plt.title("Operational drivers of prediction error, ranked")
 plt.tight_layout()
-plt.savefig(config.FIGS / "03_feature_importance.png", dpi=140)
+plt.savefig(config.FIGS / "03_feature_importance.png", dpi=config.FIG_DPI)
 plt.close()
 
 with open(config.MODELLING_METRICS, "w") as fh:

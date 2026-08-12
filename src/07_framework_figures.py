@@ -57,7 +57,7 @@ arrow(ax, (1.0, 0.10), (0.0, 0.10), GREY, lw=1.2, rad=-0.10)
 ax.text(0.5, 0.10, "evaluation feeds back into design", ha="center", va="center",
         fontsize=8, color=GREY, style="italic",
         bbox=dict(boxstyle="square,pad=0.35", facecolor="white", edgecolor="none"))
-plt.savefig(FIGS / "07_dsr_crispdm.png", dpi=170, bbox_inches="tight"); plt.close()
+plt.savefig(FIGS / "07_dsr_crispdm.png", dpi=config.FIG_DPI, bbox_inches="tight"); plt.close()
 print("  wrote 07_dsr_crispdm.png")
 
 # A timeline with the model underneath it: everything left of the publication instant
@@ -80,5 +80,5 @@ ax.text(0.63, 0.17, "leakage: post-arrival or\nrevised values entering\nthe feat
         ha="left", va="center", fontsize=8.3, color=RUST, fontweight="bold", linespacing=1.35)
 ax.text(0.5, 0.965, "Only information available before the publication instant may enter the model",
         ha="center", va="top", fontsize=9, color=INK, fontweight="bold")
-plt.savefig(FIGS / "07_leakage.png", dpi=170, bbox_inches="tight"); plt.close()
+plt.savefig(FIGS / "07_leakage.png", dpi=config.FIG_DPI, bbox_inches="tight"); plt.close()
 print("  wrote 07_leakage.png")

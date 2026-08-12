@@ -74,6 +74,11 @@ BAND_ORDER = ["0-2", "2-5", "5-10", "10-20", "20-60"]
 # statistic reported elsewhere.
 LARGE_FAILURE_S = 120
 
+# Export resolution for every static figure. 300 dpi is the print standard; the figures
+# are placed in the report about 5 to 6 inches wide, so this keeps them sharp on paper
+# rather than merely legible on screen.
+FIG_DPI = 300
+
 # Plot colours, kept consistent across the static figures and the dashboard.
 BLUE = "#2b6cb0"
 ORANGE = "#c05621"

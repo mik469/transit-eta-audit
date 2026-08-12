@@ -72,7 +72,7 @@ ax.set_ylabel("matched pairs")
 ax.set_title("Distribution of ETA errors (heavy-tailed, slight early bias)")
 ax.spines[["top", "right"]].set_visible(False)
 plt.tight_layout()
-plt.savefig(config.FIGS / "02_error_distribution.png", dpi=140)
+plt.savefig(config.FIGS / "02_error_distribution.png", dpi=config.FIG_DPI)
 plt.close()
 
 # Accuracy against lead time. This is the structure a single headline number hides: a
@@ -108,7 +108,7 @@ ax.set_title("Accuracy degrades systematically with lead time")
 ax.legend(frameon=False)
 ax.spines[["top", "right"]].set_visible(False)
 plt.tight_layout()
-plt.savefig(config.FIGS / "02_error_vs_lead.png", dpi=140)
+plt.savefig(config.FIGS / "02_error_vs_lead.png", dpi=config.FIG_DPI)
 plt.close()
 
 stated = con.execute(f"""
@@ -151,7 +151,7 @@ ax.set_title("Calibrated ETA windows via conformal prediction\n"
 ax.legend(frameon=False)
 ax.spines[["top", "right"]].set_visible(False)
 plt.tight_layout()
-plt.savefig(config.FIGS / "02_calibration.png", dpi=140)
+plt.savefig(config.FIGS / "02_calibration.png", dpi=config.FIG_DPI)
 plt.close()
 
 metrics["feed_states_uncertainty"] = stated > 1000

@@ -131,7 +131,7 @@ ax.set_ylabel("matched pairs")
 ax.set_title("Non-circular matched dataset, by mode")
 ax.spines[["top", "right"]].set_visible(False)
 plt.tight_layout()
-plt.savefig(config.FIGS / "01_pipeline_volumes.png", dpi=140)
+plt.savefig(config.FIGS / "01_pipeline_volumes.png", dpi=config.FIG_DPI)
 plt.close()
 
 print("  done (bus only; see the module docstring for why rail is not auditable here)")
